@@ -1,0 +1,8 @@
+{
+  "name": "herdr-rounds",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/"
+  }
+}
