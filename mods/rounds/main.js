@@ -6,8 +6,8 @@
 // It reads only <home>/.herdr-rounds (see CONTRACT.md). No network, no telemetry.
 // Cards show at most three text lines; click one to read it whole.
 
-import { View, div, svg } from "gpui-kit";
-import { v_flex, h_flex, Input, InputState } from "gpui-base";
+import { View, div, svg, list } from "gpui-kit";
+import { v_flex, h_flex, Input, InputState, Scrollbar, VirtualListScrollHandle } from "gpui-base";
 import {
   theme, home, focused, spaces, panes, props, closeOverlay, watchFolder, hc, run, shared, setShared, exec,
 } from "herdr";
@@ -34,6 +34,8 @@ export default class Rounds extends View {
     this.terminal = null;
     this.state = "unknown"; // live / ended / stale / unknown, for the newest round
     this.showAll = false; // the tail is shown by default; the rest waits behind one click
+    this.scroller = VirtualListScrollHandle.new();
+    this.lastNewest = 0;
     this.lease = null;
     this.dir = `${(home() || "").replace(/\\/g, "/")}/.herdr-rounds`;
 
@@ -126,6 +128,31 @@ export default class Rounds extends View {
     }
   }
 
+  /** A click on a row: the toggle line flips the tail, a card expands or folds. */
+  onRowClick(key, cx) {
+    if (key === "toggle") {
+      this.showAll = !this.showAll;
+      cx?.notify?.();
+      return;
+    }
+    const n = Number(String(key).slice(1));
+    if (!Number.isFinite(n)) return;
+    if (this.expanded.has(n)) this.expanded.delete(n);
+    else this.expanded.add(n);
+    cx?.notify?.();
+  }
+
+  /** Land on the newest round. The list measures lazily, so the last row is brought on screen
+   *  first and the bottom is asked for again once the heights are known. */
+  followNewest(cx) {
+    const from = this.showAll ? 0 : Math.max(0, this.rounds.length - TAIL);
+    const count = this.rounds.length - from + (from > 0 ? 1 : 0);
+    if (count <= 0) return;
+    this.scroller?.scroll_to_item?.(count - 1, "top");
+    cx?.timer?.after?.(120, () => this.scroller?.scroll_to_bottom?.());
+    cx?.timer?.after?.(400, () => this.scroller?.scroll_to_bottom?.());
+  }
+
   async load(cx) {
     try {
       const { terminal, tab } = this.visibleTerminal();
@@ -141,6 +168,11 @@ export default class Rounds extends View {
       const index = await readIndex(this.dir);
       this.entry = index[this.key] ?? null;
       this.rounds = await readRounds(this.dir, this.key);
+      const newest = this.rounds.at(-1)?.n ?? 0;
+      if (newest !== this.lastNewest) {
+        this.lastNewest = newest;
+        this.followNewest(cx);
+      }
       this.state = await this.liveness(this.entry);
       this.err = null;
       if (tab) this.nameTab(tab, this.tabTitle(this.entry, tab));
@@ -185,12 +217,6 @@ export default class Rounds extends View {
       .bg(open ? `${c.working}0f` : c.raised)
       .border(1).border_color(open ? `${c.working}55` : c.border)
       .cursor_pointer()
-      .on_click((_event, cx) => {
-        cx?.stop_propagation?.();
-        if (this.expanded.has(round.n)) this.expanded.delete(round.n);
-        else this.expanded.add(round.n);
-        cx?.notify?.();
-      })
       .child(head)
       .child(this.line(c, "mods/rounds/arrow-up.svg", promptFit.text, c.muted, 13.5, expanded ? 0 : 1))
       .child(this.line(c, "mods/rounds/arrow-down.svg", bodyFit.text, body ? c.foreground : c.dim, 13.5, expanded ? 0 : 2));
@@ -232,28 +258,37 @@ export default class Rounds extends View {
       .when(Boolean(props()?.overlay), (el) => el.child(div().text_size(12).text_color(colors.dim).cursor_pointer()
         .on_click(() => closeOverlay(props().overlay)).child("✕")));
 
-    const body = [];
-    if (this.err) body.push(div().text_size(12).text_color(colors.blocked).child(this.err));
-    if (!this.err && !this.rounds.length) body.push(this.emptyState(colors));
     // Oldest at the top, newest at the bottom: the panel reads like a conversation, and the round
-    // still running sits right above the composer.
+    // still running sits right above the composer. The list is virtual so it can be scrolled from
+    // code — a plain scroll area cannot, and then a long conversation opens on its oldest round.
     const from = this.showAll ? 0 : Math.max(0, this.rounds.length - TAIL);
-    const toggle = (label, color, next) =>
-      div().py(2).text_size(10.5).text_color(color).cursor_pointer()
-        .hover((style) => style.opacity(0.8))
-        .on_click((_event, cx) => {
-          this.showAll = next;
-          cx?.notify?.();
-        })
-        .child(label);
-    if (from > 0) {
-      body.push(toggle(t("more.earlier", { n: from }), colors.accent, true));
-    } else if (this.showAll && this.rounds.length > TAIL) {
-      body.push(toggle(t("more.collapse"), colors.dim, false));
-    }
+    const rows = [];
+    if (from > 0) rows.push({ key: "toggle", text: t("more.earlier", { n: from }), color: colors.accent });
+    else if (this.showAll && this.rounds.length > TAIL) rows.push({ key: "toggle", text: t("more.collapse"), color: colors.dim });
     this.rounds.forEach((round, index) => {
-      if (index >= from) body.push(this.row(colors, round, index));
+      if (index >= from) rows.push({ key: `r${round.n}`, round, index });
     });
+
+    const empty = Boolean(this.err) || this.rounds.length === 0;
+    const emptyBody = [];
+    if (this.err) emptyBody.push(div().text_size(12).text_color(colors.blocked).child(this.err));
+    if (!this.err && !this.rounds.length) emptyBody.push(this.emptyState(colors));
+
+    const scroller = empty
+      ? v_flex().flex_1().min_h(0).gap(6).overflow_y_scrollbar().children(emptyBody)
+      : v_flex().relative().flex_1().min_h(0)
+        .child(
+          list("rounds", rows.length, (i) => rows[i].key, (i) => {
+            const row = rows[i];
+            return row.round
+              ? this.row(colors, row.round, row.index)
+              : div().py(2).text_size(10.5).text_color(row.color).child(row.text);
+          })
+            .flex_1().min_h(0).w_full()
+            .track_scroll(this.scroller)
+            .on_item_click((key, cx) => this.onRowClick(key, cx)),
+        )
+        .child(Scrollbar.vertical("rounds").absolute().inset_0());
 
     const composer = h_flex().w_full().items_center().gap(6)
       .child(Input.new(this.input).flex_1().min_w(0).h(32).px(10).rounded(7)
@@ -269,7 +304,7 @@ export default class Rounds extends View {
 
     return v_flex().size_full().bg(colors.background).text_color(colors.foreground).p(12).gap(8)
       .child(head)
-      .child(v_flex().flex_1().min_h(0).gap(6).overflow_y_scrollbar().children(body))
+      .child(scroller)
       .child(composer);
   }
 }

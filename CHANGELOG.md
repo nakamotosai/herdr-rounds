@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-11-02
+
+- The panel opens on the newest round and stays there. The body is a virtual list with a scroll
+  handle, so it can be driven from code: the last row is brought on screen first (the list measures
+  lazily), then the bottom is asked for again once the heights are known. A plain scroll area could
+  not be moved, which is why a long conversation used to open on its oldest round.
+- Cards no longer carry their own click handler — a virtual list refuses handlers inside its
+  renderer — so clicks arrive through `on_item_click` and are routed by key (`toggle`, `r<n>`).
+
 ## 0.6.0 — 2026-11-02
 
 - Ten rounds by default instead of six; the rest still waits behind one click.
