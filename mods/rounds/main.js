@@ -20,6 +20,7 @@ const fmt = (key, n) => t(key, { n });
 
 const POLL_MS = 4000;
 const LEASE_MS = 30000; // how long a session-lease answer is reused
+const TAIL = 6; // the newest rounds that fit above the composer; older ones are counted, not drawn
 const NAME_TABS = true; // name an unnamed tab after its conversation; a typed name is never touched
 
 export default class Rounds extends View {
@@ -233,8 +234,15 @@ export default class Rounds extends View {
     const body = [];
     if (this.err) body.push(div().text_size(12).text_color(colors.blocked).child(this.err));
     if (!this.err && !this.rounds.length) body.push(this.emptyState(colors));
-    this.rounds.forEach((round, index) => body.push(this.row(colors, round, index)));
-    body.reverse();
+    // Oldest at the top, newest at the bottom: the panel reads like a conversation, and the round
+    // still running sits right above the composer.
+    const from = Math.max(0, this.rounds.length - TAIL);
+    if (from > 0) {
+      body.push(div().py(2).text_size(10.5).text_color(colors.dim).child(t("more.earlier", { n: from })));
+    }
+    this.rounds.forEach((round, index) => {
+      if (index >= from) body.push(this.row(colors, round, index));
+    });
 
     const composer = h_flex().w_full().items_center().gap(6)
       .child(Input.new(this.input).flex_1().min_w(0).h(32).px(10).rounded(7)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 — 2026-11-02
+
+- The list reads like a conversation: oldest at the top, the round that is still running at the
+  bottom, right above the composer. Rounds older than the last six fold into a single
+  "N earlier rounds" line, so the newest never sits below the fold.
+
 ## 0.3.0 — 2026-11-02
 
 - Five agents, each run against a real CLI and checked in the ledger: omp and pi through the
