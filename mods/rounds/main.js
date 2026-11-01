@@ -33,6 +33,7 @@ export default class Rounds extends View {
     this.expanded = new Set();
     this.terminal = null;
     this.state = "unknown"; // live / ended / stale / unknown, for the newest round
+    this.showAll = false; // the tail is shown by default; the rest waits behind one click
     this.lease = null;
     this.dir = `${(home() || "").replace(/\\/g, "/")}/.herdr-rounds`;
 
@@ -128,6 +129,7 @@ export default class Rounds extends View {
   async load(cx) {
     try {
       const { terminal, tab } = this.visibleTerminal();
+      if (terminal && terminal !== this.key) this.showAll = false;
       if (terminal) this.key = terminal;
       this.terminal = terminal;
       if (!this.key) {
@@ -236,9 +238,19 @@ export default class Rounds extends View {
     if (!this.err && !this.rounds.length) body.push(this.emptyState(colors));
     // Oldest at the top, newest at the bottom: the panel reads like a conversation, and the round
     // still running sits right above the composer.
-    const from = Math.max(0, this.rounds.length - TAIL);
+    const from = this.showAll ? 0 : Math.max(0, this.rounds.length - TAIL);
+    const toggle = (label, color, next) =>
+      div().py(2).text_size(10.5).text_color(color).cursor_pointer()
+        .hover((style) => style.opacity(0.8))
+        .on_click((_event, cx) => {
+          this.showAll = next;
+          cx?.notify?.();
+        })
+        .child(label);
     if (from > 0) {
-      body.push(div().py(2).text_size(10.5).text_color(colors.dim).child(t("more.earlier", { n: from })));
+      body.push(toggle(t("more.earlier", { n: from }), colors.accent, true));
+    } else if (this.showAll && this.rounds.length > TAIL) {
+      body.push(toggle(t("more.collapse"), colors.dim, false));
     }
     this.rounds.forEach((round, index) => {
       if (index >= from) body.push(this.row(colors, round, index));

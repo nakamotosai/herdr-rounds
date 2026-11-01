@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1 — 2026-11-02
+
+- The tail is six rounds by default; the rest waits behind a clickable "Show N earlier rounds"
+  line instead of being drawn. Expanded, it turns into "Show fewer". Switching tabs collapses it.
+
 ## 0.4.0 — 2026-11-02
 
 - The list reads like a conversation: oldest at the top, the round that is still running at the
