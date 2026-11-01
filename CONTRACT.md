@@ -65,8 +65,9 @@ node bin/rounds-write.mjs end   --terminal t12 --summary "Done: it is blue."
 ## `index.json` (optional)
 
 ```json
-{"t12":{"title":"Make the send button work","titleZh":"让发送按钮能用","sessionPath":"…","rounds":3}}
+{"t12":{"title":"Make the send button work","subtitle":"herdr · panel","sessionPath":"…","rounds":3}}
 ```
 
-`title` shows as a small subtitle; `titleZh` (or any curated title) wins as the heading. Without it the
-panel uses the conversation's first instruction, which is already in the person's language.
+`title` is the heading — the one line that says what this conversation is about. Without it the panel
+uses the conversation's first instruction, which is already in the person's language. `subtitle` is an
+optional small line under it; `sessionPath` is reserved for writers that keep a transcript path.

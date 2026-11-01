@@ -53,7 +53,7 @@ export default class Rounds extends View {
   /** The conversation's own title: a curated one first, else the person's first instruction. */
   tabTitle(entry, tab) {
     const firstPrompt = this.rounds[0]?.prompt ?? "";
-    return entry?.titleZh || (firstPrompt ? short(firstPrompt, 20) : "") || tab?.name || this.key || "";
+    return entry?.title || (firstPrompt ? short(firstPrompt, 20) : "") || tab?.name || this.key || "";
   }
 
   /** Names an unnamed tab after the conversation, and follows the title it set itself.
@@ -139,7 +139,7 @@ export default class Rounds extends View {
     const promptFit = expanded ? { text: round.prompt, cut: false } : fit(round.prompt, LINE);
     const bodyFull = body || (open ? t("run.now") : t("run.noText"));
     const bodyFit = expanded ? { text: bodyFull, cut: false } : fit(bodyFull, LINE * 2);
-    const more = !expanded && (promptFit.cut || bodyFit.cut || round.prompt.length + bodyFull.length > 40);
+    const more = !expanded && (promptFit.cut || bodyFit.cut);
 
     const head = h_flex().w_full().items_center().gap(8)
       .child(div().w(22).h(19).flex_none().rounded(4).bg(open ? `${c.working}26` : c.raised)
@@ -186,11 +186,8 @@ export default class Rounds extends View {
     const colors = theme();
     const { terminal, tab } = this.visibleTerminal();
     const key = terminal ?? this.key;
-    // The session title is generated in English; the person's own first instruction is not,
-    // so it makes the better heading. The English one stays underneath, small.
-    const english = this.entry?.title ?? "";
     const title = this.tabTitle(this.entry, tab) || t("title.fallback");
-    const subtitle = english && english !== title ? english : "";
+    const subtitle = this.entry?.subtitle && this.entry.subtitle !== title ? String(this.entry.subtitle) : "";
     const meta = [
       key,
       tab?.name,

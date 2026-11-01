@@ -155,7 +155,7 @@ export default function fleetRounds(pi) {
         updatedAt: Date.now(),
         ...patch,
       };
-      if (!entry.title && title) entry.title = title;
+      if (!entry.subtitle && title) entry.subtitle = title;
       index[key] = entry;
       await writeFile(path.join(root, "index.json"), JSON.stringify(index, null, 2));
     } catch {
