@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 — 2026-11-02
+
+- Rows carry their own spacing and clip: a virtual list does not apply the parent's `gap`, and a row
+  the list measured short must not paint over its neighbour.
+- Switching tabs counts as entering: the panel resets its follow state so every visit lands on the
+  newest round, not only when a new round appears.
+
 ## 0.7.0 — 2026-11-02
 
 - The panel opens on the newest round and stays there. The body is a virtual list with a scroll

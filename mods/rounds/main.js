@@ -36,6 +36,7 @@ export default class Rounds extends View {
     this.showAll = false; // the tail is shown by default; the rest waits behind one click
     this.scroller = VirtualListScrollHandle.new();
     this.lastNewest = 0;
+    this.lastKey = null;
     this.lease = null;
     this.dir = `${(home() || "").replace(/\\/g, "/")}/.herdr-rounds`;
 
@@ -149,8 +150,9 @@ export default class Rounds extends View {
     const count = this.rounds.length - from + (from > 0 ? 1 : 0);
     if (count <= 0) return;
     this.scroller?.scroll_to_item?.(count - 1, "top");
-    cx?.timer?.after?.(120, () => this.scroller?.scroll_to_bottom?.());
-    cx?.timer?.after?.(400, () => this.scroller?.scroll_to_bottom?.());
+    for (const wait of [120, 300, 700, 1200]) {
+      cx?.timer?.after?.(wait, () => this.scroller?.scroll_to_bottom?.());
+    }
   }
 
   async load(cx) {
@@ -169,6 +171,11 @@ export default class Rounds extends View {
       this.entry = index[this.key] ?? null;
       this.rounds = await readRounds(this.dir, this.key);
       const newest = this.rounds.at(-1)?.n ?? 0;
+      // Entering a tab is the same request as a new round: land on the newest.
+      if (this.key !== this.lastKey) {
+        this.lastKey = this.key;
+        this.lastNewest = -1;
+      }
       if (newest !== this.lastNewest) {
         this.lastNewest = newest;
         this.followNewest(cx);
@@ -281,8 +288,8 @@ export default class Rounds extends View {
           list("rounds", rows.length, (i) => rows[i].key, (i) => {
             const row = rows[i];
             return row.round
-              ? this.row(colors, row.round, row.index)
-              : div().py(2).text_size(10.5).text_color(row.color).child(row.text);
+              ? div().w_full().pb(6).child(this.row(colors, row.round, row.index))
+              : div().w_full().pb(4).pt(2).text_size(10.5).text_color(row.color).child(row.text);
           })
             .flex_1().min_h(0).w_full()
             .track_scroll(this.scroller)
