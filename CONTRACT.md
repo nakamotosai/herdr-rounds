@@ -13,7 +13,7 @@ $HERDR_ROUNDS_DIR/                     default: ~/.herdr-rounds
 ## One round
 
 ```json
-{"n":3,"prompt":"make the send button work","startedAt":1793540000000,"endedAt":1793540060000,"durMs":60000,"tools":4,"summary":"The button now sends. Enter still works."}
+{"n":3,"prompt":"make the send button work","startedAt":1793540000000,"endedAt":1793540060000,"durMs":60000,"tools":4,"summary":"The button now sends. Enter still works.","doing":"","blocked":""}
 ```
 
 | field | type | required | meaning |
@@ -26,6 +26,7 @@ $HERDR_ROUNDS_DIR/                     default: ~/.herdr-rounds
 | `tools` | number | no | how many actions the turn took; producer-defined |
 | `summary` | string | no | one or two plain sentences about what the round did |
 | `blocked` | string | no | why it is waiting (approval, input) |
+| `doing` | string | no | what the running round is doing right now ("compacting", "retrying on …"); shown instead of "Working…" |
 | `terminal` `session` `cwd` | string | no | metadata the panel ignores, kept for your own tooling |
 
 ## Rules a writer must follow, and a reader must survive
@@ -35,7 +36,10 @@ $HERDR_ROUNDS_DIR/                     default: ~/.herdr-rounds
 3. **Half-written lines are tolerated.** A reader skips a line that does not parse; a writer should write whole lines.
 4. **Unknown fields are ignored**, so you can carry extra data.
 5. **Duplicate `n` keeps the later line.**
-6. **`endedAt` missing for more than 30 minutes is treated as stale**, not "running".
+6. **A round only counts as running while its writer is alive.** The writer says so in `index.json`
+   with `live` and `hb` (see below); without a heartbeat the panel asks omp whether a live process
+   still holds the session, and only then trusts an open `endedAt`. A crashed writer stops looking
+   like work in progress.
 
 ## Smallest possible writer
 
@@ -65,8 +69,18 @@ node bin/rounds-write.mjs end   --terminal t12 --summary "Done: it is blue."
 ## `index.json` (optional)
 
 ```json
-{"t12":{"title":"Make the send button work","subtitle":"herdr · panel","sessionPath":"…","rounds":3}}
+{"t12":{"title":"Make the send button work","subtitle":"herdr · panel","sessionId":"01a192f6-…","sessionPath":"…","rounds":3,"live":true,"hb":1793540120000}}
 ```
+
+| field | type | meaning |
+|---|---|---|
+| `title` | string | heading; without it the panel uses the first instruction |
+| `subtitle` | string | optional small line under the heading |
+| `sessionId` | string | lets the panel ask `omp session lease` whether this conversation is live |
+| `sessionPath` | string | where the transcript lives; the id is read from the file name when `sessionId` is absent |
+| `rounds` | number | how many rounds the writer has recorded |
+| `live` | boolean | `false` = the writer shut down; the panel stops showing work in progress |
+| `hb` | ms epoch | last heartbeat; the panel trusts it for 15 seconds |
 
 `title` is the heading — the one line that says what this conversation is about. Without it the panel
 uses the conversation's first instruction, which is already in the person's language. `subtitle` is an

@@ -9,9 +9,9 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";
 import {
-  theme, home, focused, spaces, panes, props, closeOverlay, watchFolder, hc, run, shared, setShared,
+  theme, home, focused, spaces, panes, props, closeOverlay, watchFolder, hc, run, shared, setShared, exec,
 } from "herdr";
-import { fit, short, since, ago, isRunning, LINE } from "./layout.js";
+import { fit, short, since, ago, isRunning, liveState, sessionIdFromPath, LINE } from "./layout.js";
 import { readIndex, readRounds, hasSource, totalMs } from "./store.js";
 import { t, getLocale, setLocale, locales } from "./i18n.js";
 
@@ -19,6 +19,7 @@ import { t, getLocale, setLocale, locales } from "./i18n.js";
 const fmt = (key, n) => t(key, { n });
 
 const POLL_MS = 4000;
+const LEASE_MS = 30000; // how long a session-lease answer is reused
 const NAME_TABS = true; // name an unnamed tab after its conversation; a typed name is never touched
 
 export default class Rounds extends View {
@@ -30,6 +31,8 @@ export default class Rounds extends View {
     this.source = true;
     this.expanded = new Set();
     this.terminal = null;
+    this.state = "unknown"; // live / ended / stale / unknown, for the newest round
+    this.lease = null;
     this.dir = `${(home() || "").replace(/\\/g, "/")}/.herdr-rounds`;
 
     this.input = InputState.new({ placeholder: t("tab.prompt") });
@@ -101,6 +104,26 @@ export default class Rounds extends View {
     cx?.notify?.();
   }
 
+  /** Is the conversation still being written? A fresh heartbeat answers it for free; when the
+   *  heartbeat is missing or stale, ask omp whether a live process holds the session. */
+  async liveness(entry) {
+    const state = liveState(entry, Date.now());
+    if (state === "live" || state === "ended") return state;
+    const id = String(entry?.sessionId ?? "") || sessionIdFromPath(entry?.sessionPath);
+    if (!id || typeof exec !== "function") return state;
+    const cached = this.lease;
+    if (cached && cached.id === id && Date.now() - cached.at < LEASE_MS) return cached.state;
+    try {
+      const r = await exec("omp", ["session", "lease", "--json", "--", id]);
+      const answer = JSON.parse(String(r?.stdout ?? "{}"));
+      const next = Array.isArray(answer?.held) && answer.held.includes(id) ? "live" : "ended";
+      this.lease = { id, at: Date.now(), state: next };
+      return next;
+    } catch {
+      return state;
+    }
+  }
+
   async load(cx) {
     try {
       const { terminal, tab } = this.visibleTerminal();
@@ -115,6 +138,7 @@ export default class Rounds extends View {
       const index = await readIndex(this.dir);
       this.entry = index[this.key] ?? null;
       this.rounds = await readRounds(this.dir, this.key);
+      this.state = await this.liveness(this.entry);
       this.err = null;
       if (tab) this.nameTab(tab, this.tabTitle(this.entry, tab));
     } catch (error) {
@@ -133,11 +157,11 @@ export default class Rounds extends View {
   }
 
   row(c, round, index) {
-    const open = isRunning(round, index, this.rounds.length);
+    const open = isRunning(round, index, this.rounds.length, this.state);
     const expanded = this.expanded.has(round.n);
     const body = round.summary || "";
     const promptFit = expanded ? { text: round.prompt, cut: false } : fit(round.prompt, LINE);
-    const bodyFull = body || (open ? t("run.now") : t("run.noText"));
+    const bodyFull = body || (open ? (round.doing || t("run.now")) : t("run.noText"));
     const bodyFit = expanded ? { text: bodyFull, cut: false } : fit(bodyFull, LINE * 2);
     const more = !expanded && (promptFit.cut || bodyFit.cut);
 

@@ -46,7 +46,27 @@ export function since(ms, now = Date.now(), t = (k, v) => k.replace("{n}", v)) {
   return t("since.day", Math.round(h / 24));
 }
 
-/** A row without an end time is the round running now; anything older than the grace window is stale. */
-export function isRunning(round, index, total, now = Date.now(), graceMs = 30 * 60 * 1000) {
-  return !round?.endedAt && round?.n === total && now - (round?.startedAt ?? 0) < graceMs && index === total - 1;
+/** What the ledger says about the process that wrote it:
+ *  "live" (a heartbeat inside the window), "ended" (it said so), "stale" (it stopped without a word). */
+export function liveState(entry, now = Date.now(), staleMs = 15000) {
+  if (!entry) return "unknown";
+  if (entry.live === false) return "ended";
+  const hb = Number(entry.hb) || 0;
+  if (!hb) return "unknown";
+  return now - hb < staleMs ? "live" : "stale";
+}
+
+/** The round running now: the newest one, still open, in a conversation that is still alive.
+ *  `state` comes from liveState() or from a session lease. */
+export function isRunning(round, index, total, state = "unknown") {
+  if (!round || round.endedAt || index !== total - 1) return false;
+  return state !== "ended" && state !== "stale";
+}
+
+/** omp session ids are the tail of the file name: `<timestamp>_<uuid>.jsonl`. */
+export function sessionIdFromPath(file) {
+  const name = String(file ?? "").split(/[\\/]/).pop() ?? "";
+  const bare = name.replace(/\.jsonl$/i, "");
+  const at = bare.lastIndexOf("_");
+  return at >= 0 ? bare.slice(at + 1) : "";
 }

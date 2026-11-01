@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fit, short, since, ago, isRunning, LINE, CJK } from "../mods/rounds/layout.js";
+import { fit, short, since, ago, isRunning, liveState, sessionIdFromPath, LINE, CJK } from "../mods/rounds/layout.js";
 
 test("short keeps one line and marks the cut", () => {
   assert.equal(short("hello"), "hello");
@@ -31,10 +31,26 @@ test("since and ago speak both languages", () => {
   assert.equal(ago(0), "");
 });
 
-test("isRunning only trusts the newest round inside the grace window", () => {
+test("liveState reads the writer's heartbeat, not the clock alone", () => {
   const now = 1_000_000_000_000;
-  assert.equal(isRunning({ n: 3, startedAt: now - 1000, endedAt: null }, 2, 3, now), true);
-  assert.equal(isRunning({ n: 2, startedAt: now - 1000, endedAt: null }, 1, 3, now), false); // not the newest
-  assert.equal(isRunning({ n: 3, startedAt: now - 3600_000, endedAt: null }, 2, 3, now), false); // stale
-  assert.equal(isRunning({ n: 3, startedAt: now - 1000, endedAt: now }, 2, 3, now), false); // closed
+  assert.equal(liveState({ live: true, hb: now - 2_000 }, now), "live");
+  assert.equal(liveState({ live: true, hb: now - 60_000 }, now), "stale");
+  assert.equal(liveState({ live: false, hb: 0 }, now), "ended");
+  assert.equal(liveState({}, now), "unknown"); // a writer that never sent a heartbeat
+  assert.equal(liveState(null, now), "unknown");
+});
+
+test("isRunning needs an open newest round and a writer that is still alive", () => {
+  assert.equal(isRunning({ n: 3, endedAt: null }, 2, 3, "live"), true);
+  assert.equal(isRunning({ n: 3, endedAt: null }, 2, 3, "unknown"), true); // no heartbeat to trust
+  assert.equal(isRunning({ n: 3, endedAt: null }, 2, 3, "stale"), false); // the writer went away
+  assert.equal(isRunning({ n: 3, endedAt: null }, 2, 3, "ended"), false);
+  assert.equal(isRunning({ n: 2, endedAt: null }, 1, 3, "live"), false); // not the newest
+  assert.equal(isRunning({ n: 3, endedAt: 5 }, 2, 3, "live"), false); // closed
+});
+
+test("sessionIdFromPath reads the id off the file name on either separator", () => {
+  assert.equal(sessionIdFromPath("C:/x/2026-10-31T17-16-15-326Z_01a192f6.jsonl"), "01a192f6");
+  assert.equal(sessionIdFromPath("/home/a/sessions/-x/2026-11-01T00-00-00-000Z_abc.jsonl"), "abc");
+  assert.equal(sessionIdFromPath(""), "");
 });

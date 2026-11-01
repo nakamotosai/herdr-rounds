@@ -33,6 +33,9 @@ the two fields yourself. The panel is a reader — it never talks to your model.
 
 - **Follows the visible tab.** Switching tabs switches conversations; the panel never mixes two.
 - **Live while it runs.** The running round appears the moment you send, and its step count grows.
+- **Honest about liveness.** A round counts as running only while its writer is alive — a heartbeat,
+  or `omp session lease` when there is none — so a crashed session stops looking busy. When the
+  harness knows more than "working", the card says it: `compacting`, `retrying on …`.
 - **Three lines, then click.** Cards stay compact; a click expands both halves.
 - **Send from the panel.** Type at the bottom, press Enter or the Send button — it types into that
   conversation for you.

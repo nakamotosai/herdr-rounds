@@ -24,6 +24,7 @@ const MAX_MD_ROUNDS = 20;
 const KEEP = 160; // characters kept from the user's instruction
 const SUMMARY = 140; // characters kept from the round's wrap-up
 const TICK_MS = 2000;
+const HB_MS = 5000; // how often the ledger says "still here"; the panel trusts it for 15 s
 
 /** @param {unknown} value @param {number} n */
 function cut(value, n = KEEP) {
@@ -92,6 +93,8 @@ export default function fleetRounds(pi) {
   let partial = Buffer.alloc(0);
   let lastCompletedAt = 0;
   let busy = false;
+  let lastHeartbeat = 0;
+  let titleSlotMtime = 0;
 
   const ensureDirs = () => mkdir(roundsDir, { recursive: true });
 
@@ -123,6 +126,33 @@ export default function fleetRounds(pi) {
     }
   }
 
+  /** Current title from the fixed-width slot that starts every session file (see omp's
+   *  session.md). 256 bytes instead of a scan; legacy files without one return "". */
+  async function readTitleSlot(file) {
+    if (!file) return "";
+    try {
+      const handle = await openFile(file, "r");
+      const buffer = Buffer.alloc(256);
+      const { bytesRead } = await handle.read(buffer, 0, 256, 0);
+      await handle.close();
+      const line = buffer.subarray(0, bytesRead).toString("utf8").split("\n")[0];
+      const slot = JSON.parse(line);
+      return slot?.type === "title" && typeof slot.title === "string" ? slot.title.slice(0, 120) : "";
+    } catch {
+      return "";
+    }
+  }
+
+  /** Says "this process is alive" without touching the rounds themselves, so a crashed or
+   *  closed session stops looking like it is still working. */
+  async function heartbeat(force = false) {
+    if (nested) return;
+    const now = Date.now();
+    if (!force && now - lastHeartbeat < HB_MS) return;
+    lastHeartbeat = now;
+    await writeIndex({ live: true, hb: now });
+  }
+
   function renderMarkdown() {
     const head = `# ${terminal || key}${cwd ? ` · ${cwd}` : ""}`;
     const body = rows.slice(-MAX_MD_ROUNDS).map((row) => {
@@ -133,6 +163,7 @@ export default function fleetRounds(pi) {
         `**Round:** ${row.summary || "(no closing note)"}`,
       ];
       if (row.blocked) lines.push(`**Blocked:** ${row.blocked}`);
+      if (row.doing) lines.push(`**Doing:** ${row.doing}`);
       return lines.join("\n");
     });
     return [head, "", ...body, ""].join("\n");
@@ -155,7 +186,7 @@ export default function fleetRounds(pi) {
         updatedAt: Date.now(),
         ...patch,
       };
-      if (!entry.subtitle && title) entry.subtitle = title;
+      if (title) entry.subtitle = title;
       index[key] = entry;
       await writeFile(path.join(root, "index.json"), JSON.stringify(index, null, 2));
     } catch {
@@ -185,7 +216,7 @@ export default function fleetRounds(pi) {
     try {
       const child = execFile(
         "hc",
-        ["label", terminal, `round=${row.n}`, `doing=${cut(row.summary || "", 40)}`, `hb=${Math.floor(Date.now() / 1000)}`],
+        ["label", terminal, `round=${row.n}`, `doing=${cut(row.doing || row.summary || "", 40)}`, `hb=${Math.floor(Date.now() / 1000)}`],
         { windowsHide: true },
         () => {},
       );
@@ -241,6 +272,7 @@ export default function fleetRounds(pi) {
         tools: 0,
         summary: "",
         blocked: "",
+        doing: "",
       });
       return true;
     }
@@ -286,7 +318,19 @@ export default function fleetRounds(pi) {
         offset = 0;
         partial = Buffer.alloc(0);
       }
-      if (info.size === offset) return;
+      let titleChanged = false;
+      if (info.mtimeMs !== titleSlotMtime) {
+        titleSlotMtime = info.mtimeMs;
+        const slot = await readTitleSlot(sessionPath);
+        if (slot && slot !== title) {
+          title = slot;
+          titleChanged = true;
+        }
+      }
+      if (info.size === offset) {
+        if (titleChanged) await writeIndex({ rounds: rows.length });
+        return;
+      }
 
       const handle = await openFile(sessionPath, "r");
       const length = info.size - offset;
@@ -322,7 +366,7 @@ export default function fleetRounds(pi) {
         }
         changed = true;
       }
-      if (changed) await writeLedger();
+      if (changed || titleChanged) await writeLedger();
     } catch {
       /* ignore */
     } finally {
@@ -335,6 +379,17 @@ export default function fleetRounds(pi) {
     if (!row || row.endedAt) return;
     row.endedAt = Date.now();
     row.durMs = Math.max(0, row.endedAt - row.startedAt);
+    row.doing = "";
+    await writeLedger();
+  }
+
+  /** What the running round is doing right now, when the harness knows more than "working". */
+  async function setDoing(text) {
+    const row = rows.at(-1);
+    if (!row || row.endedAt) return;
+    const next = cut(text, 40);
+    if (row.doing === next) return;
+    row.doing = next;
     await writeLedger();
   }
 
@@ -367,6 +422,7 @@ export default function fleetRounds(pi) {
     await migrateLegacy();
     await resolveKey(ctx);
     await sync({ full: true });
+    await heartbeat(true);
   });
 
   pi.on("session_switch", async (_event, ctx) => {
@@ -376,6 +432,26 @@ export default function fleetRounds(pi) {
 
   pi.on("message_end", async () => {
     await sync();
+  });
+
+  pi.on("retry_fallback_applied", async (event) => {
+    await setDoing(`retrying on ${event?.to ?? "another model"}`);
+  });
+
+  pi.on("ttsr_triggered", async () => {
+    await setDoing("rule triggered");
+  });
+
+  pi.on("goal_updated", async () => {
+    await setDoing("goal updated");
+  });
+
+  pi.on("session.compacting", async () => {
+    await setDoing("compacting");
+  });
+
+  pi.on("session_compact", async () => {
+    await setDoing("");
   });
 
   pi.on("tool_approval_requested", async (event) => {
@@ -393,11 +469,15 @@ export default function fleetRounds(pi) {
   pi.on("session_shutdown", async () => {
     await sync();
     await closeOpenRound();
+    await writeIndex({ live: false, hb: 0 });
   });
 
   if (!nested) {
     try {
-      const timer = setInterval(() => void sync(), TICK_MS);
+      const timer = setInterval(() => {
+        void sync();
+        void heartbeat();
+      }, TICK_MS);
       timer?.unref?.();
     } catch {
       /* ignore */

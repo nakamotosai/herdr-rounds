@@ -19,6 +19,7 @@ export function normalizeRound(row) {
     durMs,
     tools: Number(row?.tools) || 0,
     blocked: String(row?.blocked ?? ""),
+    doing: String(row?.doing ?? ""),
     terminal: row?.terminal ? String(row.terminal) : "",
   };
 }
