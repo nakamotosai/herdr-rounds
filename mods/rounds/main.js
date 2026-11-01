@@ -150,13 +150,14 @@ export default class Rounds extends View {
     cx?.notify?.();
   }
 
-  line(c, label, text, color, size = 13.5, lines = 2) {
+  /** One side of a card: an arrow for who said it, then the words.
+   *  `lines` caps the height (the pane can be narrower than `fit` assumed); 0 means "expanded". */
+  line(c, icon, text, color, size = 13.5, lines = 2) {
     if (!text) return null;
+    const body = div().flex_1().min_w(0).whitespace_normal().text_size(size).line_height(1.5).text_color(color).child(text);
     return h_flex().w_full().items_start().gap(8)
-      .child(div().w(42).flex_none().pt(1).text_size(10.5).text_color(c.dim).child(label))
-      .child(div().flex_1().min_w(0).whitespace_normal().text_size(size).line_height(1.5).text_color(color)
-        // The pane can be narrower than `fit` assumed, so the height is capped too.
-        .max_h(Math.round(lines * size * 1.5)).overflow_hidden().child(text));
+      .child(div().w(11).flex_none().pt(3).child(svg(icon).size(9).text_color(c.dim)))
+      .child(lines > 0 ? body.max_h(Math.round(lines * size * 1.5)).overflow_hidden() : body);
   }
 
   row(c, round, index) {
@@ -166,7 +167,6 @@ export default class Rounds extends View {
     const promptFit = expanded ? { text: round.prompt, cut: false } : fit(round.prompt, LINE);
     const bodyFull = body || (open ? (round.doing || t("run.now")) : t("run.noText"));
     const bodyFit = expanded ? { text: bodyFull, cut: false } : fit(bodyFull, LINE * 2);
-    const more = !expanded && (promptFit.cut || bodyFit.cut);
 
     const head = h_flex().w_full().items_center().gap(8)
       .child(div().w(22).h(19).flex_none().rounded(4).bg(open ? `${c.working}26` : c.raised)
@@ -192,9 +192,8 @@ export default class Rounds extends View {
         cx?.notify?.();
       })
       .child(head)
-      .child(this.line(c, t("you"), promptFit.text, c.muted, 13.5, 1))
-      .child(this.line(c, t("round"), bodyFit.text, body ? c.foreground : c.dim, 13.5, 2))
-      .when(more, (el) => el.child(div().pl(50).text_size(10.5).text_color(c.dim).child(t("card.more"))));
+      .child(this.line(c, "mods/rounds/arrow-up.svg", promptFit.text, c.muted, 13.5, expanded ? 0 : 1))
+      .child(this.line(c, "mods/rounds/arrow-down.svg", bodyFit.text, body ? c.foreground : c.dim, 13.5, expanded ? 0 : 2));
   }
 
   emptyState(c) {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — 2026-11-02
+
+- Who said what is an arrow now: a small up triangle for your instruction, a down triangle for the
+  round's result, instead of the words "you" and "did".
+- Fixed expanding a card doing nothing. The height clamp stayed at one and two lines after a click,
+  so the card grew its text but still clipped it; an expanded card is no longer capped.
+- The "tap to read it all" line is gone — the whole card was already the target, and the hint cost a
+  line on every card that had one.
+
 ## 0.4.1 — 2026-11-02
 
 - The tail is six rounds by default; the rest waits behind a clickable "Show N earlier rounds"
