@@ -80,7 +80,9 @@ export default function fleetRounds(pi) {
   // Only the interactive session records. OMPCODE is 1 for it too, so it cannot be the test:
   // subagents nest their session file inside the parent's (`<parent>.jsonl\Name.jsonl`) and carry
   // no terminal id; print mode (`omp -p`) inherits both and must not write into a terminal's ledger.
-  const printMode = process.argv.includes("-p") || process.argv.includes("--print");
+  // `-p` runs inherit a parent shell's terminal id, so they are skipped unless asked for.
+  const printMode =
+    (process.argv.includes("-p") || process.argv.includes("--print")) && process.env.ROUNDS_PRINT !== "1";
   const nested = /\.jsonl[\\/]/.test(process.env.PI_SESSION_FILE ?? "") || !terminal || printMode;
 
   let sessionId = "";
@@ -405,19 +407,41 @@ export default function fleetRounds(pi) {
     key = terminal || sessionId || "unknown";
   }
 
-  pi.setLabel?.("Fleet rounds");
+  const on = (name, handler) => {
+    try {
+      pi.on(name, handler);
+    } catch {
+      /* the harness does not know this event */
+    }
+  };
 
-  pi.registerCommand("rounds-backfill", {
-    description: "Rebuild this conversation's rounds from its transcript",
-    handler: async (_args, ctx) => {
-      await resolveKey(ctx);
-      await sync({ full: true });
-      await closeOpenRound();
-      ctx?.ui?.notify?.(`rebuilt ${rows.length} rounds`, "info");
-    },
-  });
+  // Some harnesses refuse action calls while the module is still loading; register on first use.
+  let registered = false;
+  function registerOnce() {
+    if (registered) return;
+    registered = true;
+    try {
+      pi.setLabel?.("Fleet rounds");
+    } catch {
+      /* no labels here */
+    }
+    try {
+      pi.registerCommand("rounds-backfill", {
+        description: "Rebuild this conversation's rounds from its transcript",
+        handler: async (_args, ctx) => {
+          await resolveKey(ctx);
+          await sync({ full: true });
+          await closeOpenRound();
+          ctx?.ui?.notify?.(`rebuilt ${rows.length} rounds`, "info");
+        },
+      });
+    } catch {
+      /* no commands here */
+    }
+  }
 
-  pi.on("session_start", async (_event, ctx) => {
+  on("session_start", async (_event, ctx) => {
+    registerOnce();
     await ensureDirs();
     await migrateLegacy();
     await resolveKey(ctx);
@@ -425,54 +449,60 @@ export default function fleetRounds(pi) {
     await heartbeat(true);
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
+  on("session_switch", async (_event, ctx) => {
     await resolveKey(ctx);
     await sync({ full: true });
   });
 
-  pi.on("message_end", async () => {
+  on("message_end", async () => {
     await sync();
   });
 
-  pi.on("retry_fallback_applied", async (event) => {
+  on("retry_fallback_applied", async (event) => {
     await setDoing(`retrying on ${event?.to ?? "another model"}`);
   });
 
-  pi.on("ttsr_triggered", async () => {
+  on("ttsr_triggered", async () => {
     await setDoing("rule triggered");
   });
 
-  pi.on("goal_updated", async () => {
+  on("goal_updated", async () => {
     await setDoing("goal updated");
   });
 
-  pi.on("session.compacting", async () => {
+  on("session.compacting", async () => {
     await setDoing("compacting");
   });
 
-  pi.on("session_compact", async () => {
+  on("session_compact", async () => {
     await setDoing("");
   });
 
-  pi.on("tool_approval_requested", async (event) => {
+  on("tool_approval_requested", async (event) => {
     const row = rows.at(-1);
     if (!row) return;
     row.blocked = cut(event?.reason ?? "waiting for approval", 60);
     await writeLedger();
   });
 
-  pi.on("agent_end", async () => {
+  on("agent_end", async () => {
     await sync();
     await closeOpenRound();
   });
 
-  pi.on("session_shutdown", async () => {
+  // pi settles an agent instead of ending it; the round is over either way.
+  on("agent_settled", async () => {
+    await sync();
+    await closeOpenRound();
+  });
+
+  on("session_shutdown", async () => {
     await sync();
     await closeOpenRound();
     await writeIndex({ live: false, hb: 0 });
   });
 
-  if (!nested) {
+  if (!nested && !printMode) {
     try {
       const timer = setInterval(() => {
         void sync();

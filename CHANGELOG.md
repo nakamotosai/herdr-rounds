@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 — 2026-11-02
+
+- Five agents, each run against a real CLI and checked in the ledger: omp and pi through the
+  extension, claude through three hooks, codex and opencode through `bin/rounds-run.mjs`.
+- `bin/rounds-hook.mjs`: one hook entry for CLIs that hand the event over as JSON on stdin; reads the
+  instruction from `prompt`, the closing line from `last_assistant_message`, and falls back to the
+  transcript.
+- `bin/rounds-run.mjs`: wraps any CLI command so a round opens before it and closes after it.
+- `bin/rounds-lib.mjs`: the ledger operations the three writers share; `rounds-write.mjs` gains
+  `doing --text`.
+- The adapter registers its command lazily and tolerates unknown events, so the same file loads in
+  omp and pi; pi's `agent_settled` closes the round.
+- `INTEGRATIONS.md` documents every wiring and what each one can see.
+
 ## 0.2.0 — 2026-11-02
 
 - Liveness stops being a guess. The writer publishes `live` and `hb` in `index.json`; when that is

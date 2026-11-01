@@ -19,14 +19,18 @@ cp -r herdr-rounds/mods/rounds ~/.config/herdr-app/mods/rounds
 Herdr 第一次看到这个文件夹就把它停靠在右侧（`mod.json`：`"place":"right"`），以后新建的布局也带它。
 
 **面板需要数据源**：它读 `~/.herdr-rounds/rounds/<终端>.jsonl`（格式见 [CONTRACT.md](CONTRACT.md)）。
-自带 omp 适配器：
+下面五个都接好了，且都用真实 CLI 跑通过：
 
-```sh
-cp adapters/omp/rounds-omp.ts ~/.omp/agent/extensions/rounds-omp.ts
-```
+| agent | 接法 | 安装 |
+|---|---|---|
+| **omp** | 扩展 `adapters/omp/rounds-omp.ts` | `cp adapters/omp/rounds-omp.ts ~/.omp/agent/extensions/` |
+| **pi** | 同一个文件，装成 pi 扩展 | `cp adapters/omp/rounds-omp.ts ~/.pi/agent/extensions/rounds.ts` |
+| **claude** | 三个 hook → `bin/rounds-hook.mjs` | 见 [INTEGRATIONS.md](INTEGRATIONS.md#claude) 的 JSON 片段 |
+| **codex** | 包装命令 `bin/rounds-run.mjs` | `node bin/rounds-run.mjs "改一下" -- codex exec "改一下"` |
+| **opencode** | 包装命令 `bin/rounds-run.mjs` | `node bin/rounds-run.mjs "打个招呼" -- opencode run "打个招呼"` |
 
-别的 agent 也行：在 hook 里调 `bin/rounds-write.mjs`（`start` / `step` / `end`），或自己写那两行 JSON。
-面板只是读者，不会和你的模型通信。
+别的 agent 也行：在 hook 里调 `bin/rounds-write.mjs`（`start` / `step` / `end`），或自己写那几行 JSON。
+面板只是读者，不会和你的模型通信。细节与限制见 [INTEGRATIONS.md](INTEGRATIONS.md)。
 
 ## 特性
 

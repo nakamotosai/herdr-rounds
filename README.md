@@ -20,14 +20,19 @@ Herdr docks it on the right the first time it sees the folder (`mod.json`: `"pla
 shows up in layouts you make later. To rename or move it, edit your layout; nothing else is required.
 
 **The panel needs a data source.** It reads `~/.herdr-rounds/rounds/<terminal>.jsonl` — see
-[CONTRACT.md](CONTRACT.md). Ships with an adapter for [omp](https://omp.dev):
+[CONTRACT.md](CONTRACT.md). These five are wired and were each run against a real CLI:
 
-```sh
-cp adapters/omp/rounds-omp.ts ~/.omp/agent/extensions/rounds-omp.ts
-```
+| agent | connects through | setup |
+|---|---|---|
+| **omp** | extension `adapters/omp/rounds-omp.ts` | `cp adapters/omp/rounds-omp.ts ~/.omp/agent/extensions/` |
+| **pi** | the same file, as a pi extension | `cp adapters/omp/rounds-omp.ts ~/.pi/agent/extensions/rounds.ts` |
+| **claude** | three hooks → `bin/rounds-hook.mjs` | JSON snippet in [INTEGRATIONS.md](INTEGRATIONS.md#claude) |
+| **codex** | wrapper `bin/rounds-run.mjs` | `node bin/rounds-run.mjs "fix it" -- codex exec "fix it"` |
+| **opencode** | wrapper `bin/rounds-run.mjs` | `node bin/rounds-run.mjs "say hi" -- opencode run "say hi"` |
 
 Any other agent works too: call `bin/rounds-write.mjs` from a hook (`start` / `step` / `end`), or write
-the two fields yourself. The panel is a reader — it never talks to your model.
+the fields yourself. The panel is a reader — it never talks to your model.
+[INTEGRATIONS.md](INTEGRATIONS.md) has the exact commands and what each integration can and cannot see.
 
 ## What it does
 
