@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 — 2026-11-02
+
+- The arrows are a touch larger and use the muted colour, so they read as icons rather than specks.
+- `preview.png` shows the new cards.
+
 ## 0.5.0 — 2026-11-02
 
 - Who said what is an arrow now: a small up triangle for your instruction, a down triangle for the

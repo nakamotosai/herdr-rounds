@@ -156,7 +156,7 @@ export default class Rounds extends View {
     if (!text) return null;
     const body = div().flex_1().min_w(0).whitespace_normal().text_size(size).line_height(1.5).text_color(color).child(text);
     return h_flex().w_full().items_start().gap(8)
-      .child(div().w(11).flex_none().pt(3).child(svg(icon).size(9).text_color(c.dim)))
+      .child(div().w(12).flex_none().pt(3).child(svg(icon).size(10).text_color(c.muted)))
       .child(lines > 0 ? body.max_h(Math.round(lines * size * 1.5)).overflow_hidden() : body);
   }
 
