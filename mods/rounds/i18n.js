@@ -11,7 +11,7 @@ const EN = {
   "run.noText": "(no closing note for this round)",
   "card.more": "Tap to read it all",
   "you": "you",
-  "round": "this round",
+  "round": "did",
   "empty.rows": "Nothing recorded for this conversation yet.",
   "empty.hint": "The first message you send shows up here immediately; an agent's earlier history is rebuilt when its session starts.",
   "empty.adapter": "No data source found. Install the adapter for your agent — see CONTRACT.md in the repo.",

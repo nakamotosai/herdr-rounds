@@ -15,6 +15,9 @@ import { fit, short, since, ago, isRunning, LINE } from "./layout.js";
 import { readIndex, readRounds, hasSource, totalMs } from "./store.js";
 import { t, getLocale, setLocale, locales } from "./i18n.js";
 
+/** layout.js helpers take `(key, n)`; the i18n `t` takes `(key, vars)`. */
+const fmt = (key, n) => t(key, { n });
+
 const POLL_MS = 4000;
 const NAME_TABS = true; // name an unnamed tab after its conversation; a typed name is never touched
 
@@ -120,16 +123,16 @@ export default class Rounds extends View {
     cx?.notify?.();
   }
 
-  line(t, label, text, color, size = 13.5, lines = 2) {
+  line(c, label, text, color, size = 13.5, lines = 2) {
     if (!text) return null;
     return h_flex().w_full().items_start().gap(8)
-      .child(div().w(30).flex_none().pt(1).text_size(11).text_color(t.dim).child(label))
+      .child(div().w(42).flex_none().pt(1).text_size(10.5).text_color(c.dim).child(label))
       .child(div().flex_1().min_w(0).whitespace_normal().text_size(size).line_height(1.5).text_color(color)
         // The pane can be narrower than `fit` assumed, so the height is capped too.
         .max_h(Math.round(lines * size * 1.5)).overflow_hidden().child(text));
   }
 
-  row(t, round, index) {
+  row(c, round, index) {
     const open = isRunning(round, index, this.rounds.length);
     const expanded = this.expanded.has(round.n);
     const body = round.summary || "";
@@ -139,21 +142,21 @@ export default class Rounds extends View {
     const more = !expanded && (promptFit.cut || bodyFit.cut || round.prompt.length + bodyFull.length > 40);
 
     const head = h_flex().w_full().items_center().gap(8)
-      .child(div().w(22).h(19).flex_none().rounded(4).bg(open ? `${t.working}26` : t.raised)
+      .child(div().w(22).h(19).flex_none().rounded(4).bg(open ? `${c.working}26` : c.raised)
         .flex().items_center().justify_center().text_size(11).font_bold()
-        .text_color(open ? t.working : t.muted).child(String(round.n)))
+        .text_color(open ? c.working : c.muted).child(String(round.n)))
       .child(open
-        ? svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)
-        : div().size(7).flex_none().rounded(4).bg(t.done))
-      .child(div().flex_1().text_size(11.2).text_color(t.muted)
-        .child(`${t("meta.steps", { n: round.tools ?? 0 })}${round.durMs ? ` · ${ago(round.durMs, t)}` : ""}`))
-      .child(div().text_size(10.5).text_color(open ? t.working : t.dim)
-        .child(open ? t("run.active") : since(round.endedAt, Date.now(), t)));
+        ? svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(c.working).spin(900)
+        : div().size(7).flex_none().rounded(4).bg(c.done))
+      .child(div().flex_1().text_size(11.2).text_color(c.muted)
+        .child(`${t("meta.steps", { n: round.tools ?? 0 })}${round.durMs ? ` · ${ago(round.durMs, fmt)}` : ""}`))
+      .child(div().text_size(10.5).text_color(open ? c.working : c.dim)
+        .child(open ? t("run.active") : since(round.endedAt, Date.now(), fmt)));
 
     return v_flex()
       .w_full().gap(4).px(11).py(9).rounded(6)
-      .bg(open ? `${t.working}0f` : t.raised)
-      .border(1).border_color(open ? `${t.working}55` : t.border)
+      .bg(open ? `${c.working}0f` : c.raised)
+      .border(1).border_color(open ? `${c.working}55` : c.border)
       .cursor_pointer()
       .on_click((_event, cx) => {
         cx?.stop_propagation?.();
@@ -162,21 +165,21 @@ export default class Rounds extends View {
         cx?.notify?.();
       })
       .child(head)
-      .child(this.line(t, t("you"), promptFit.text, t.muted, 13.5, 1))
-      .child(this.line(t, t("round"), bodyFit.text, body ? t.foreground : t.dim, 13.5, 2))
-      .when(more, (el) => el.child(div().pl(38).text_size(10.5).text_color(t.dim).child(t("card.more"))));
+      .child(this.line(c, t("you"), promptFit.text, c.muted, 13.5, 1))
+      .child(this.line(c, t("round"), bodyFit.text, body ? c.foreground : c.dim, 13.5, 2))
+      .when(more, (el) => el.child(div().pl(50).text_size(10.5).text_color(c.dim).child(t("card.more"))));
   }
 
-  emptyState(t) {
+  emptyState(c) {
     if (!this.source) {
       return v_flex().gap(5)
-        .child(div().text_size(12.5).text_color(t.muted).child(t("empty.adapter")))
-        .child(div().text_size(11.5).text_color(t.dim).child("CONTRACT.md · adapters/omp"));
+        .child(div().text_size(12.5).text_color(c.muted).child(t("empty.adapter")))
+        .child(div().text_size(11.5).text_color(c.dim).child("CONTRACT.md · adapters/omp"));
     }
     return v_flex().gap(5)
-      .child(div().text_size(12.5).text_color(t.muted).child(t("empty.rows")))
-      .child(div().text_size(11.5).text_color(t.dim).child(t("empty.hint")))
-      .child(div().text_size(11).text_color(t.dim).child(t("empty.scope")));
+      .child(div().text_size(12.5).text_color(c.muted).child(t("empty.rows")))
+      .child(div().text_size(11.5).text_color(c.dim).child(t("empty.hint")))
+      .child(div().text_size(11).text_color(c.dim).child(t("empty.scope")));
   }
 
   render() {
@@ -192,7 +195,7 @@ export default class Rounds extends View {
       key,
       tab?.name,
       this.rounds.length ? t("meta.rounds", { n: this.rounds.length }) : "",
-      totalMs(this.rounds) ? ago(totalMs(this.rounds), t) : "",
+      totalMs(this.rounds) ? ago(totalMs(this.rounds), fmt) : "",
     ].filter(Boolean).join(" · ");
 
     const head = h_flex().w_full().items_start().gap(8)

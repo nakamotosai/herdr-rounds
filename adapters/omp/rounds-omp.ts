@@ -128,11 +128,11 @@ export default function fleetRounds(pi) {
     const body = rows.slice(-MAX_MD_ROUNDS).map((row) => {
       const secs = Math.round((row.durMs ?? 0) / 1000);
       const lines = [
-        `## ${row.n}轮 · ${new Date(row.startedAt).toLocaleTimeString()} · ${secs}s · ${row.tools}步`,
-        `**你:** ${row.prompt}`,
-        `**这轮:** ${row.summary || "（还没有文字汇报）"}`,
+        `## round ${row.n} · ${new Date(row.startedAt).toLocaleTimeString()} · ${secs}s · ${row.tools} steps`,
+        `**You:** ${row.prompt}`,
+        `**Round:** ${row.summary || "(no closing note)"}`,
       ];
-      if (row.blocked) lines.push(`**卡在:** ${row.blocked}`);
+      if (row.blocked) lines.push(`**Blocked:** ${row.blocked}`);
       return lines.join("\n");
     });
     return [head, "", ...body, ""].join("\n");
@@ -353,12 +353,12 @@ export default function fleetRounds(pi) {
   pi.setLabel?.("Fleet rounds");
 
   pi.registerCommand("rounds-backfill", {
-    description: "把这个对话的历史重建进进度记录（~/.omp/fleet）",
+    description: "Rebuild this conversation's rounds from its transcript",
     handler: async (_args, ctx) => {
       await resolveKey(ctx);
       await sync({ full: true });
       await closeOpenRound();
-      ctx?.ui?.notify?.(`已重建 ${rows.length} 轮`, "info");
+      ctx?.ui?.notify?.(`rebuilt ${rows.length} rounds`, "info");
     },
   });
 
@@ -381,7 +381,7 @@ export default function fleetRounds(pi) {
   pi.on("tool_approval_requested", async (event) => {
     const row = rows.at(-1);
     if (!row) return;
-    row.blocked = cut(event?.reason ?? "审批中", 60);
+    row.blocked = cut(event?.reason ?? "waiting for approval", 60);
     await writeLedger();
   });
 
