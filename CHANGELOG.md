@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 — 2026-11-02
+
+- Ten rounds by default instead of six; the rest still waits behind one click.
+
 ## 0.5.1 — 2026-11-02
 
 - The arrows are a touch larger and use the muted colour, so they read as icons rather than specks.

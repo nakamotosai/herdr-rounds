@@ -20,7 +20,7 @@ const fmt = (key, n) => t(key, { n });
 
 const POLL_MS = 4000;
 const LEASE_MS = 30000; // how long a session-lease answer is reused
-const TAIL = 6; // the newest rounds that fit above the composer; older ones are counted, not drawn
+const TAIL = 10; // the newest rounds drawn by default; older ones wait behind one click
 const NAME_TABS = true; // name an unnamed tab after its conversation; a typed name is never touched
 
 export default class Rounds extends View {
