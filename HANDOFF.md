@@ -17,11 +17,13 @@ gh run list --limit 2       → main / v0.7.1 均 success
 git rev-list --count origin/main..HEAD → 0
 ```
 
+## Verified by the user（2026-11-02）
+
+- **鼠标点击**：卡片展开/收起、「展开更早 N 轮」经用户实测正常（虚拟列表的 `on_item_click(key)` 路径成立）。
+
 ## Not verified
 
-1. **鼠标点击**（卡片展开/收起、「展开更早 N 轮」）。虚拟列表禁止在渲染器里挂事件，点击改走
-   `on_item_click(key)`，`herdr` 没有模拟左键的命令，无法在本机取证。
-2. 用户报的「卡片重叠 + 间距消失 + 进来看不到最新」在我这侧复现不出：同一对话（32 轮）截图正常。
+1. 用户报的「卡片重叠 + 间距消失 + 进来看不到最新」在我这侧复现不出：同一对话（32 轮）截图正常。
    已加两道防护（行内 `pb(6)` 包裹、卡片 `overflow_hidden()`），但**没有在故障现场验证过**。
 
 ## Next safe action（只一件）
